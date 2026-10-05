@@ -22,34 +22,19 @@ web framework.
 python -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
+export FLASK_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+export ADMIN_PASSWORD="<choose a strong password>"
 FLASK_APP=run.py flask run
 ```
 
+`FLASK_SECRET_KEY` signs session cookies. If it is unset, a random key is
+generated on each start. `ADMIN_PASSWORD` sets the password of the `admin`
+account. If it is unset, the admin account gets an unknown random password.
+
 ### Vulnerabilities
 
-This project contains the following vulnerabilities:
-
-- Remote Code Execution
-- SQL injection
-- Insecure Deserialization
-- Directory Traversal
-- Open Redirect
-- Sensitive Data Exposure
-- Broken Access Control
-- Security Misconfiguration
-
-You can find each one in the codebase by grepping for the string
-`vulnerability`:
-
-```
-$ grep vulnerability . -R -n | grep -v README
-./flask_webgoat/actions.py:43:    # vulnerability: Remote Code Execution
-./flask_webgoat/users.py:37:    # vulnerability: SQL Injection
-./flask_webgoat/auth.py:17:    # vulnerability: SQL Injection
-./flask_webgoat/actions.py:60:    # vulnerability: Insecure Deserialization
-./flask_webgoat/actions.py:35:        # vulnerability: Directory Traversal
-./flask_webgoat/auth.py:45:        # vulnerability: Open Redirect
-./flask_webgoat/__init__.py:12:        # vulnerability: Sensitive Data Exposure
-./run.py:7:    # vulnerability: Broken Access Control
-./run.py:9:    # vulnerability: Security Misconfiguration
-```
+The deliberately planted vulnerabilities (remote code execution, SQL
+injection, insecure deserialization, directory traversal, open redirect,
+sensitive data exposure, broken access control and security
+misconfiguration) have been remediated. See `security-report.md` for the
+findings and the fixes applied.
