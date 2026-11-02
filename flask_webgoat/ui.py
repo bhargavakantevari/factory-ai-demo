@@ -1,6 +1,6 @@
 import sqlite3
 
-from flask import Blueprint, request, render_template
+from flask import Blueprint, request, render_template, session
 from . import query_db
 
 bp = Blueprint("ui", __name__)
@@ -8,10 +8,14 @@ bp = Blueprint("ui", __name__)
 
 @bp.route("/search")
 def search():
+    if session.get("user_info") is None:
+        message = "you need to log in to search users"
+        return render_template("error.html", message=message), 401
+
     query_param = request.args.get("query")
     if query_param is None:
         message = "please provide the query parameter"
-        return render_template("error.html", message=message)
+        return render_template("error.html", message=message), 400
 
     try:
         query = "SELECT username, access_level FROM user WHERE username LIKE ?;"
@@ -19,6 +23,6 @@ def search():
         return render_template(
             "search.html", results=results, num_results=len(results), query=query_param
         )
-    except sqlite3.Error as err:
-        message = "Error while executing query " + query_param + ": " + err
-        return render_template("error.html", message=message)
+    except sqlite3.Error:
+        message = "Error while executing the search query"
+        return render_template("error.html", message=message), 500
