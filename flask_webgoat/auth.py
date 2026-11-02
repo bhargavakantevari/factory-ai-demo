@@ -1,7 +1,34 @@
+from urllib.parse import urlsplit
+
 from flask import Blueprint, request, jsonify, session, redirect
+from werkzeug.security import check_password_hash
+
 from . import query_db
 
 bp = Blueprint("auth", __name__)
+
+
+def authenticate(username, password):
+    query = "SELECT id, username, access_level, password FROM user WHERE username = ?"
+    row = query_db(query, (username,), True)
+    if row is None or not check_password_hash(row[3], password):
+        return None
+    return row[0], row[1], row[2]
+
+
+def start_session(user_info):
+    # Clearing first drops any attacker-planted session values (session fixation).
+    session.clear()
+    session["user_info"] = user_info
+
+
+def safe_redirect_target(url):
+    """Allow only same-site relative paths such as "/search"."""
+    url = url.replace("\\", "/")
+    parts = urlsplit(url)
+    if parts.scheme or parts.netloc or not url.startswith("/") or url.startswith("//"):
+        return "/"
+    return url
 
 
 @bp.route("/login", methods=["POST"])
@@ -14,15 +41,10 @@ def login():
             400,
         )
 
-    # vulnerability: SQL Injection
-    query = (
-        "SELECT id, username, access_level FROM user WHERE username = '%s' AND password = '%s'"
-        % (username, password)
-    )
-    result = query_db(query, [], True)
-    if result is None:
+    user_info = authenticate(username, password)
+    if user_info is None:
         return jsonify({"bad_login": True}), 400
-    session["user_info"] = (result[0], result[1], result[2])
+    start_session(user_info)
     return jsonify({"success": True})
 
 
@@ -39,10 +61,8 @@ def login_and_redirect():
             400,
         )
 
-    query = "SELECT id, username, access_level FROM user WHERE username = ? AND password = ?"
-    result = query_db(query, (username, password), True)
-    if result is None:
-        # vulnerability: Open Redirect
-        return redirect(url)
-    session["user_info"] = (result[0], result[1], result[2])
+    user_info = authenticate(username, password)
+    if user_info is None:
+        return redirect(safe_redirect_target(url))
+    start_session(user_info)
     return jsonify({"success": True})
