@@ -19,6 +19,6 @@ def search():
         return render_template(
             "search.html", results=results, num_results=len(results), query=query_param
         )
-    except sqlite3.Error as err:
-        message = "Error while executing query " + query_param + ": " + err
+    except sqlite3.Error:
+        message = "Error while executing the search query"
         return render_template("error.html", message=message)
