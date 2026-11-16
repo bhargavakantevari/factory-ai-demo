@@ -1,16 +1,16 @@
 import os
+import secrets
 import sqlite3
 from pathlib import Path
 
-from flask import Flask, g
+from flask import Flask
+from werkzeug.security import generate_password_hash
 
 DB_FILENAME = "database.db"
 
 
 def query_db(query, args=(), one=False, commit=False):
     with sqlite3.connect(DB_FILENAME) as conn:
-        # vulnerability: Sensitive Data Exposure
-        conn.set_trace_callback(print)
         cur = conn.cursor().execute(query, args)
         if commit:
             conn.commit()
@@ -19,7 +19,13 @@ def query_db(query, args=(), one=False, commit=False):
 
 def create_app():
     app = Flask(__name__)
-    app.secret_key = "aeZ1iwoh2ree2mo0Eereireong4baitixaixu5Ee"
+    # A random fallback key keeps sessions signed but invalidates them on restart.
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "0") == "1",
+    )
 
     db_path = Path(DB_FILENAME)
     if db_path.exists():
@@ -30,9 +36,12 @@ def create_app():
     (id INTEGER PRIMARY KEY, username TEXT, password TEXT, access_level INTEGER)"""
     conn.execute(create_table_query)
 
+    # Without WEBGOAT_ADMIN_PASSWORD the admin gets an unguessable password,
+    # so no default credential exists.
+    admin_password = os.environ.get("WEBGOAT_ADMIN_PASSWORD") or secrets.token_urlsafe(32)
     insert_admin_query = """INSERT INTO user (id, username, password, access_level)
-    VALUES (1, 'admin', 'maximumentropy', 0)"""
-    conn.execute(insert_admin_query)
+    VALUES (1, 'admin', ?, 0)"""
+    conn.execute(insert_admin_query, (generate_password_hash(admin_password),))
     conn.commit()
     conn.close()
 
